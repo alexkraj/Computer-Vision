@@ -1,0 +1,2 @@
+Improve disparity calculation
+crop out an element of the image	
