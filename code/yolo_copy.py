@@ -1,39 +1,10 @@
-################################################################################
-
-# Example : performs YOLO (v3) object detection from a video file
-# specified on the command line (e.g. python FILE.py video_file) or from an
-# attached web camera
-
-# Author : Toby Breckon, toby.breckon@durham.ac.uk
-#
-
-# Copyright (c) 2019 Toby Breckon, Durham University, UK
-# License : LGPL - http://www.gnu.org/licenses/lgpl.html
-
-# Implements the You Only Look Once (YOLO) object detection architecture decribed in full in:
-# Redmon, J., & Farhadi, A. (2018). Yolov3: An incremental improvement. arXiv preprint arXiv:1804.02767.
-# https://pjreddie.com/media/files/papers/YOLOv3.pdf
-
-# This code: significant portions based in part on the tutorial and example available at:
-# https://www.learnopencv.com/deep-learning-based-object-detection-using-yolov3-with-opencv-python-c/
-# https://github.com/spmallick/learnopencv/blob/master/ObjectDetection-YOLO/object_detection_yolo.py
-# under LICENSE: https://github.com/spmallick/learnopencv/blob/master/ObjectDetection-YOLO/LICENSE
-
-# To use first download the following files:
-
-# https://pjreddie.com/media/files/yolov3.weights
-# https://github.com/pjreddie/darknet/blob/master/cfg/yolov3.cfg?raw=true
-# https://github.com/pjreddie/darknet/blob/master/data/coco.names?raw=true
-
-################################################################################
-
 import cv2
 import argparse
 import sys
 import math
 import numpy as np
 
-##############################################################################
+
 
 keep_processing = True
 
@@ -49,20 +20,12 @@ parser.add_argument("-w", "--weights_file", type=str, help="network weights", de
 
 args = parser.parse_args()
 
-##############################################################################
-# dummy on trackbar callback function
-
-
-def on_trackbar(val):
-    return
-
 #####################################################################
 # Draw the predicted bounding box on the specified image
 # image: image detection performed on
 # class_name: string name of detected object_detection
 # left, top, right, bottom: rectangle parameters for detection
 # colour: to draw detection rectangle in
-
 
 def drawPred(image, class_name, confidence, left, top, right, bottom, colour):
     # Draw a bounding box.
@@ -196,8 +159,6 @@ net.setPreferableTarget(cv2.dnn.DNN_TARGET_OPENCL)
 
 windowName = 'YOLOv3 object detection: ' + args.weights_file
 cv2.namedWindow(windowName, cv2.WINDOW_NORMAL)
-trackbarName = 'reporting confidence > (x 0.01)'
-cv2.createTrackbar(trackbarName, windowName, 0, 100, on_trackbar)
 
 ###############################################################################
 
@@ -217,6 +178,7 @@ if (((args.video_file) and (cap.open(str(args.video_file)))) or (cap.open(args.c
         # if camera /video file successfully open then read frame
         if (cap.isOpened):
             ret, frame = cap.read()
+            print (frame)
 
             # when we reach the end of the video (file) exit cleanly
             if (ret == 0):
@@ -237,7 +199,7 @@ if (((args.video_file) and (cap.open(str(args.video_file)))) or (cap.open(args.c
         results = net.forward(output_layer_names)
 
         # remove the bounding boxes with low confidence
-        confThreshold = cv2.getTrackbarPos(trackbarName, windowName) / 100
+        # confThreshold = cv2.getTrackbarPos(trackbarName, windowName) / 100
         classIDs, confidences, boxes = postprocess(frame, results, confThreshold, nmsThreshold)
 
         # draw resulting detections on image
@@ -265,16 +227,12 @@ if (((args.video_file) and (cap.open(str(args.video_file)))) or (cap.open(args.c
         # wait 40ms or less depending on processing time taken (i.e. 1000ms / 25 fps = 40 ms)
         key = cv2.waitKey(max(2, 40 - int(math.ceil(stop_t)))) & 0xFF
 
-        # if user presses "x" then exit  / press "f" for fullscreen display
         if (key == ord('x')):
             keep_processing = False
         elif (key == ord('f')):
             args.fullscreen = not(args.fullscreen)
 
-    # close all windows
     cv2.destroyAllWindows()
 
 else:
     print("No video file specified or camera connected.")
-
-############################################################

@@ -81,8 +81,8 @@ for filename_left in left_file_list:
     print(full_path_filename_right)
     print()
 
-    # check the file is a PNG file (left) and check a correspondoning right image
-    # actually exists
+    # check the file is a PNG file (left) and check a correspondoning right
+    # image actually exists
 
     if ('.png' in filename_left) and (os.path.isfile(full_path_filename_right)):
 
@@ -105,15 +105,15 @@ for filename_left in left_file_list:
         grayL = cv2.cvtColor(imgL, cv2.COLOR_BGR2GRAY)
         grayR = cv2.cvtColor(imgR, cv2.COLOR_BGR2GRAY)
 
-        # perform preprocessing - raise to the power, as this subjectively appears
-        # to improve subsequent disparity calculation
+        # perform preprocessing - raise to the power, as this subjectively
+        # appears to improve subsequent disparity calculation
 
         grayL = np.power(grayL, 0.75).astype('uint8')
         grayR = np.power(grayR, 0.75).astype('uint8')
 
         # compute disparity image from undistorted and rectified stereo images
-        # that we have loaded
-        # (which for reasons best known to the OpenCV developers is returned scaled by 16)
+        # that we have loaded(which for reasons best known to the OpenCV
+        # # developers is returned scaled by 16)
 
         disparity = stereoProcessor.compute(grayL, grayR)
 
