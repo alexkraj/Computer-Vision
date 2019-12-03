@@ -3,6 +3,7 @@
 
 In this assignment we are dealing with the automatic detection of objects, and the estimation of their distance from the vehicle (i.e. ranging), within stereo video imagery from an on-board forward facing stereo camera. This can be performed by integrating the use of depth (disparity) information recovered from an existing stereo vision algorithm with an object detection algorithms. Knowledge of the distance of objects that have the potential to move within the scene (i.e. dynamic objects, such as pedestrians/vehicles) assists both automatic forward motion planning and collision avoidance within the overall autonomous control system of the vehicle.
 
+Linter used: Flake8
 
 # How to run
 

@@ -1,2 +1,9 @@
 Improve disparity calculation
-crop out an element of the image	
+crop out an element of the image if the detection is getting a little confused	
+
+Qualitative evidence of performance - based on a dataset of N examples, this approach works X% of the time for detections of Y regions
+
+Quantitative evidence of performance - examples of it working
+
+Script must display the colour image AND the disparity image as it runs	
+- Can keep in the same window
