@@ -92,7 +92,7 @@ for filename_left in left_file_list:
 
         imgL = cv2.imread(full_path_filename_left, cv2.IMREAD_COLOR)
         cv2.imshow('Left Image', imgL)
-
+        
         imgR = cv2.imread(full_path_filename_right, cv2.IMREAD_COLOR)
         cv2.imshow('Right Image', imgR)
 

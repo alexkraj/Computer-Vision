@@ -65,15 +65,6 @@ full_path_directory_right = os.path.join(master_path_to_dataset, directory_to_cy
 
 ########################################################################################################################
 
-
-
-
-# get a list of the left image files and sort them (by timestamp in filename)
-def on_trackbar(val):
-    return
-
-
-
 #######################     PREPROCESS     ################ ################ ##############################################
 
 
@@ -113,7 +104,6 @@ def generate_stereo_disparity(imgL, imgR):
     _, disparity = cv2.threshold(disparity, 0, max_disparity * 16, cv2.THRESH_TOZERO);
     disparity_scaled = (disparity / 16.).astype(np.uint8);
     return disparity_scaled
-
     return disparity
 
 # returns regions of interest that we want to keep
@@ -180,59 +170,7 @@ def drawPred(classId, confidence, left, top, right, bottom, output_img, colour,d
         (left + round(1.5*labelSize[0]), top + baseLine), (255, 255, 255), cv2.FILLED)
     cv2.putText(output_img, label, (left, top), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0,0,0), 1)
 
-#####################################################################
-# Remove the bounding boxes with low confidence using non-maxima suppression
-# image: image detection performed on
-# results: output from YOLO CNN network
-# threshold_confidence: threshold on keeping detection
-# threshold_nms: threshold used in non maximum suppression
-#
-# def postprocess(image, results, threshold_confidence, threshold_nms):
-#     frameHeight = image.shape[0]
-#     frameWidth = image.shape[1]
-#
-#     classIds = []
-#     confidences = []
-#     boxes = []
-#
-#     # Scan through all the bounding boxes output from the network and..
-#     # 1. keep only the ones with high confidence scores.
-#     # 2. assign the box class label as the class with the highest score.
-#     # 3. construct a list of bounding boxes, class labels and confidence scores
-#
-#     classIds = []
-#     confidences = []
-#     boxes = []
-#     for result in results:
-#         for detection in result:
-#             scores = detection[5:]
-#             classId = np.argmax(scores)
-#             confidence = scores[classId]
-#             if confidence > threshold_confidence:
-#                 center_x = int(detection[0] * frameWidth)
-#                 center_y = int(detection[1] * frameHeight)
-#                 width = int(detection[2] * frameWidth)
-#                 height = int(detection[3] * frameHeight)
-#                 left = int(center_x - width / 2)
-#                 top = int(center_y - height / 2)
-#                 classIds.append(classId)
-#                 confidences.append(float(confidence))
-#                 boxes.append([left, top, width, height])
-#
-#     # Perform non maximum suppression to eliminate redundant overlapping boxes with
-#     # lower confidences.
-#     indices = cv2.dnn.NMSBoxes(boxes, confidences, confThreshold, nmsThreshold)
-#     for i in indices:
-#         i = i[0]
-#         box = boxes[i]
-#         left = box[0]
-#         top = box[1]
-#         width = box[2]
-#         height = box[3]
-#         drawPred(classIds[i], confidences[i], left, top, left + width, top + height)
 
-
-# Remove the bounding boxes with low confidence using non-maxima suppression
 # Remove the bounding boxes with low confidence using non-maxima suppression
 def postprocess(img, outs):
     frameHeight = img.shape[0]
@@ -433,5 +371,3 @@ for filename_left in left_file_list:
 # close all windows
 
 cv2.destroyAllWindows()
-
-#####################################################################

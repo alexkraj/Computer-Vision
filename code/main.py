@@ -1,18 +1,12 @@
 # CTVT58
-# November 2019
 # SSA - Computer Vision Coursework - Due Fri 6/12/2019
-# Main program
 
 import cv2
 import os
 import numpy as np
 from math import ceil
-import argparse
-import sys
+from statistics import median
 
-parser = argparse.ArgumentParser(description='Perform ' + sys.argv[0] + ' example operation on incoming camera/video image')
-parser.add_argument("-fs", "--fullscreen", action='store_true', help="run in full screen mode")
-args = parser.parse_args()
 
 # STEREO DISPARITY VARIABLES
 master_path_to_dataset = "../data/"  # ** need to edit this **
@@ -43,6 +37,10 @@ nmsThreshold = 0.4   # Non-maximum suppression threshold
 inpWidth = 416       # Width of network's input image
 inpHeight = 416      # Height of network's input image
 
+objects_in_scene_classes = []
+objects_in_scene_distances = []
+classes_checked = ["person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck"]
+
 classes = None
 with open(classes_file, 'rt') as f:
     classes = f.read().rstrip('\n').split('\n')
@@ -51,21 +49,53 @@ camera_focal_length_px = 399.9745178222656  # focal length in pixels
 camera_focal_length_m = 4.8 / 1000  # focal length in metres (4.8 mm)
 stereo_camera_baseline_m = 0.2090607502  # camera baseline in metres
 windowName = 'YOLOv3 object detection: ' + weights_file
-cv2.namedWindow(windowName, cv2.WINDOW_NORMAL)
+cv2.imshow(windowName, cv2.WINDOW_NORMAL)
 
-max_disparity = 64;
-
-# YOLO METHODS
-def on_trackbar(val):
-    return
+max_disparity = 64
 
 
+############################# GET DISPARITY #############################
+#TODO Imrove disparity calculation (this might help in the marks $$$)
+def calculate_stereo_disparity(image_left, image_right):
+    stereoProcessor = cv2.StereoSGBM_create(0, max_disparity, 21)
+
+    grey_left = cv2.cvtColor(image_left, cv2.COLOR_BGR2GRAY)
+    grey_right = cv2.cvtColor(image_right, cv2.COLOR_BGR2GRAY)
+    # perform preprocessing - raise to the power, as this subjectively
+    # appears to improve subsequent disparity calculation
+    grey_left = np.power(grey_left, 0.75).astype('uint8')
+    grey_right = np.power(grey_right, 0.75).astype('uint8')
+
+    disparity = stereoProcessor.compute(grey_left, grey_right)
+
+    dispNoiseFilter = 5  # increase for more agressive filtering
+    cv2.filterSpeckles(disparity, 0, 4000, max_disparity - dispNoiseFilter)
+
+    _, disparity = cv2.threshold(disparity, 0, max_disparity * 16, cv2.THRESH_TOZERO)
+    disparity_scaled = (disparity / 16.).astype(np.uint8)
+    return disparity_scaled
+    return disparity
+
+
+def calculate_median(arr):
+    if arr and (median(arr) < 45):
+        return str(round(median(arr),2)) + " m"
+
+
+####################### GET COORDINATES OF THE BOX #######################
+
+
+############################## DRAW THE BOX ##############################
 def drawPred(image, class_name, confidence, left, top, right, bottom, colour):
     # Draw a bounding box.
     cv2.rectangle(image, (left, top), (right, bottom), colour, 3)
 
+    distance = 5
     # construct label
-    label = '%s:%.2f is %.2f meters away' % (class_name, confidence, 5)
+    label = '%s (%.2f) = %.2f m away' % (class_name, confidence, distance)
+    if(class_name in classes_checked):
+        objects_in_scene_classes.append(class_name)
+        objects_in_scene_distances.append(distance)
 
     # Display the label at the top of the bounding box
     labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
@@ -73,9 +103,9 @@ def drawPred(image, class_name, confidence, left, top, right, bottom, colour):
     cv2.rectangle(image, (left, top - round(1.5*labelSize[1])),
                          (left + round(1.5*labelSize[0]), top + baseLine),
                          (255, 255, 255), cv2.FILLED)
-    cv2.putText(image, label, (left, top), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 1)
+    cv2.putText(image, label, (left, top), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
 
-
+################ REMOVE BOUNDING BOXES WITH LOW CONFIDENCE ###############
 def postprocess(image, results, threshold_confidence, threshold_nms):
     frameHeight = image.shape[0]
     frameWidth = image.shape[1]
@@ -115,20 +145,16 @@ def postprocess(image, results, threshold_confidence, threshold_nms):
 
 
 def getOutputsNames(net):
-    # Get the names of all the layers in the network
     layersNames = net.getLayerNames()
-    # Get the names of the output layers, i.e. the layers with unconnected outputs
     return [layersNames[i[0] - 1] for i in net.getUnconnectedOutLayers()]
 
-
-# STARTING UP VARIABLE WORK:
-
+####################### SETTING DARKNET VARIABLES ########################
 net = cv2.dnn.readNetFromDarknet(config_file, weights_file)
 output_layer_names = getOutputsNames(net)
 net.setPreferableBackend(cv2.dnn.DNN_BACKEND_DEFAULT)
 net.setPreferableTarget(cv2.dnn.DNN_TARGET_OPENCL)
 
-# RUNNING OF THE SIMULATION:
+######################### RUNNING THE ANALYSIS ###########################
 for filename_left in left_file_list:
 
     if ((len(skip_forward_file_pattern) > 0) and not(skip_forward_file_pattern in filename_left)):
@@ -150,13 +176,19 @@ for filename_left in left_file_list:
         imgR = cv2.imread(full_path_filename_right, cv2.IMREAD_COLOR)
         backup_imgL = cv2.imread(full_path_filename_left, cv2.IMREAD_COLOR)
 
-        cv2.imshow("Right Image", imgR)
+        # cv2.imshow("Right Image", imgR)
         print("-- files loaded successfully")
         print()
 
-        # while (keep_processing):
-        start_t = cv2.getTickCount()
+        #TODO preprocessing of the left and right images to ignore bits (e.g car)
+        # left mask
+        # right mask
+        disparity = calculate_stereo_disparity(imgL, imgR)
+        
+        cv2.imshow("Disparity", (disparity * (256. / max_disparity)).astype(np.uint8))
+
         frame = imgL
+        start_t = cv2.getTickCount()
 
         # create a 4D tensor (OpenCV 'blob') from image frame (pixels scaled 0->1, image resized)
         tensor = cv2.dnn.blobFromImage(frame, 1/255, (inpWidth, inpHeight), [0, 0, 0], 1, crop=False)
@@ -166,7 +198,6 @@ for filename_left in left_file_list:
         results = net.forward(output_layer_names)
 
         # remove the bounding boxes with low confidence
-        # confThreshold = cv2.getTrackbarPos(trackbarName, windowName) / 100
         classIDs, confidences, boxes = postprocess(frame, results, confThreshold, nmsThreshold)
 
         for detected_object in range(0, len(boxes)):
@@ -175,43 +206,32 @@ for filename_left in left_file_list:
             top = box[1]
             width = box[2]
             height = box[3]
+
+            # distance = median(z_axis_value)
             drawPred(frame, classes[classIDs[detected_object]], confidences[detected_object], left, top, left + width, top + height, (255, 178, 50))
 
-        # Put efficiency information. The function getPerfProfile returns the overall time for inference(t) and the timings for each of the layers(in layersTimes)
-        t, _ = net.getPerfProfile()
-        label = 'Inference time: %.2f ms' % (t * 1000.0 / cv2.getTickFrequency())
-        cv2.putText(frame, label, (0, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255))
+        objects_in_scene_classes = []
+        objects_in_scene_distances = []
 
-        newName = "image"
-        cv2.imshow(newName, frame)
-        # cv2.setWindowProperty(newName, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN & args.fullscreen)
-
-        # stop the timer and convert to ms. (to see how long processing and display takes)
+        cv2.imshow(windowName, frame)
+        
         stop_t = ((cv2.getTickCount() - start_t)/cv2.getTickFrequency()) * 1000
+        print("YOLOv3 took %.2f ms to process this frame"% (stop_t))
 
-        # start the event loop + detect specific key strokes
-        # wait 40ms or less depending on processing time taken (i.e. 1000ms / 25 fps = 40 ms)
-        key = cv2.waitKey(max(2, 40 - int(ceil(stop_t)))) & 0xFF
-
-        if (key == ord('x')):
-            keep_processing = False
-
-        # imgR = cv2.imread(full_path_filename_right, cv2.IMREAD_COLOR)
-        # cv2.imshow('Right Image', imgR)
-
-       
-        key = cv2.waitKey(max(2, 40 - int(ceil(stop_t)))) & 0xFF
-        # key = cv2.waitKey(40 * (not(pause_playback))) & 0xFF  # wait 40ms (i.e. 1000ms / 25 fps = 40 ms)
+        key = cv2.waitKey(40 * (not(pause_playback))) & 0xFF  # wait 40ms (i.e. 1000ms / 25 fps = 40 ms)
         if (key == ord('x')):       # exit
             break  # exit
         elif (key == ord('s')):     # save
+            cv2.imwrite("sgbm-disparty.png", disparity)
             cv2.imwrite("left.png", imgL)
-        elif (key == ord('c')):     # crop
+            cv2.imwrite("right.png", imgR)
+        elif (key == ord('c')): # crop
             crop_disparity = not(crop_disparity)
-        elif (key == ord(' ')):     # pause (on next frame)
+        elif (key == ord('p')):  # pause (on next frame)
             pause_playback = not(pause_playback)
     else:
         print("-- files skipped (perhaps one is missing or not PNG)")
         print()
 
 cv2.destroyAllWindows()
+quit()
