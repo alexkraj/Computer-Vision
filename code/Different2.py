@@ -22,6 +22,7 @@ from statistics import median
 
 ############################### INITIALISE VALUES ######################################
 
+
 class_file = 'coco.names'
 config_file = 'yolov3.cfg'
 weights_file = 'yolov3.weights'
@@ -42,6 +43,7 @@ inpWidth = 416  # Width of network's input image
 inpHeight = 416  # Height of network's input image
 
 max_disparity = 64;
+
 
 # where is the data ? - set this to where you have it
 
@@ -166,33 +168,90 @@ def get_y_x_coordinates_array (top,bottom,left,right):  # Calculate box coordina
 ################################# DRAW THE BOX    ######################################################################
 
 # Draw the predicted bounding box
-def drawPred(image, class_name, confidence, left, top, right, bottom, colour, depth):
-    # Draw a bounding box.
-    cv2.rectangle(image, (left, top), (right, bottom), colour, 3)
+def drawPred(classId, confidence, left, top, right, bottom, output_img, colour,depth):
 
-    # construct label
-    label = '%s:%.2f' % (class_name, confidence)
 
-    #Display the label at the top of the bounding box
+    # DRAW labels and boxes
+    cv2.rectangle(output_img, (left, top), (right, bottom), colour, 3)   # Draw a bounding box.
+    label = '%s:%s' % (classes[classId], depth) # construct label
     labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
     top = max(top, labelSize[1])
-    cv2.rectangle(image, (left, top - round(1.5*labelSize[1])),
+    cv2.rectangle(output_img, (left, top - round(1.5*labelSize[1])),
         (left + round(1.5*labelSize[0]), top + baseLine), (255, 255, 255), cv2.FILLED)
-    cv2.putText(image, label, (left, top), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0,0,0), 1)
+    cv2.putText(output_img, label, (left, top), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0,0,0), 1)
 
-def postprocess(image, results, threshold_confidence, threshold_nms):
-    frameHeight = image.shape[0]
-    frameWidth = image.shape[1]
+#####################################################################
+# Remove the bounding boxes with low confidence using non-maxima suppression
+# image: image detection performed on
+# results: output from YOLO CNN network
+# threshold_confidence: threshold on keeping detection
+# threshold_nms: threshold used in non maximum suppression
+#
+# def postprocess(image, results, threshold_confidence, threshold_nms):
+#     frameHeight = image.shape[0]
+#     frameWidth = image.shape[1]
+#
+#     classIds = []
+#     confidences = []
+#     boxes = []
+#
+#     # Scan through all the bounding boxes output from the network and..
+#     # 1. keep only the ones with high confidence scores.
+#     # 2. assign the box class label as the class with the highest score.
+#     # 3. construct a list of bounding boxes, class labels and confidence scores
+#
+#     classIds = []
+#     confidences = []
+#     boxes = []
+#     for result in results:
+#         for detection in result:
+#             scores = detection[5:]
+#             classId = np.argmax(scores)
+#             confidence = scores[classId]
+#             if confidence > threshold_confidence:
+#                 center_x = int(detection[0] * frameWidth)
+#                 center_y = int(detection[1] * frameHeight)
+#                 width = int(detection[2] * frameWidth)
+#                 height = int(detection[3] * frameHeight)
+#                 left = int(center_x - width / 2)
+#                 top = int(center_y - height / 2)
+#                 classIds.append(classId)
+#                 confidences.append(float(confidence))
+#                 boxes.append([left, top, width, height])
+#
+#     # Perform non maximum suppression to eliminate redundant overlapping boxes with
+#     # lower confidences.
+#     indices = cv2.dnn.NMSBoxes(boxes, confidences, confThreshold, nmsThreshold)
+#     for i in indices:
+#         i = i[0]
+#         box = boxes[i]
+#         left = box[0]
+#         top = box[1]
+#         width = box[2]
+#         height = box[3]
+#         drawPred(classIds[i], confidences[i], left, top, left + width, top + height)
+
+
+# Remove the bounding boxes with low confidence using non-maxima suppression
+# Remove the bounding boxes with low confidence using non-maxima suppression
+def postprocess(img, outs):
+    frameHeight = img.shape[0]
+    frameWidth = img.shape[1]
 
     classIds = []
     confidences = []
     boxes = []
-    for result in results:
-        for detection in result:
+    # Scan through all the bounding boxes output from the network and keep only the
+    # ones with high confidence scores. Assign the box's class label as the class with the highest score.
+    classIds = []
+    confidences = []
+    boxes = []
+    for out in outs:
+        for detection in out:
             scores = detection[5:]
             classId = np.argmax(scores)
             confidence = scores[classId]
-            if confidence > threshold_confidence:
+            if confidence > confThreshold:
                 center_x = int(detection[0] * frameWidth)
                 center_y = int(detection[1] * frameHeight)
                 width = int(detection[2] * frameWidth)
@@ -204,21 +263,8 @@ def postprocess(image, results, threshold_confidence, threshold_nms):
                 boxes.append([left, top, width, height])
 
     # Perform non maximum suppression to eliminate redundant overlapping boxes with
-    # lower confidences
-    classIds_nms = []
-    confidences_nms = []
-    boxes_nms = []
-
-    indices = cv2.dnn.NMSBoxes(boxes, confidences, threshold_confidence, threshold_nms)
-    for i in indices:
-        i = i[0]
-        classIds_nms.append(classIds[i])
-        confidences_nms.append(confidences[i])
-        boxes_nms.append(boxes[i])
-
-    # return post processed lists of classIds, confidences and bounding boxes
-    return (classIds_nms, confidences_nms, boxes_nms)
-
+    # lower confidences.
+    return classIds, boxes, confidences, confThreshold, nmsThreshold
 
 
 ################################################################################
@@ -340,12 +386,11 @@ for filename_left in left_file_list:
         results = net.forward(output_layer_names)
 
         # Remove the bounding boxes with low confidence
-        # classIds, boxes, confidences, confThreshold, nmsThreshold = postprocess(imgL, results)
-        classIds, confidences, boxes = postprocess(imgL, results, confThreshold, nmsThreshold)
-        
+        classIds, boxes, confidences, confThreshold, nmsThreshold = postprocess(imgL, results)
+
         # TODO REPORT THIS
         indices = cv2.dnn.NMSBoxes(boxes, confidences, confThreshold, nmsThreshold)
-        
+
         for i in indices:
             i = i[0]
             box = boxes[i]
@@ -365,7 +410,7 @@ for filename_left in left_file_list:
             # Go through all pixels and calculate Z taking into account focal length and baseline
             for x in range(horizontal_start, horizontal_end):
                 for y in range(vertical_start, vertical_end):
-                    # Calculate Z = (f * 😎 / disparity[y, x];
+                    # Calculate Z = (f * B) / disparity[y, x];
                     try:
                         if (disparity[y, x] > 0):
                             Z.append((camera_focal_length_px * stereo_camera_baseline_m) / disparity[y, x])
