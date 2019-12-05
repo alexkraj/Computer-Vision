@@ -146,7 +146,7 @@ def get_mean_pixels(top,bottom,left,right): # Get 30 % of the box in the middle
     return ((top - bottom) * (left - right) * 0.3)/100
 
 
-def get_y_x_coordinates_array (top,bottom,left,right):  # Calculate box coordinates
+def get_y_x_coordinates_array(top,bottom,left,right):  # Calculate box coordinates
     horzontal_start, horizontal_end = get_horizontal_center_of_bounding(left, right,
                                                                         get_mean_pixels(top, bottom, left, right)/2)
     vertical_start, vertical_end = get_vertical_center_of_bounding(top, bottom,

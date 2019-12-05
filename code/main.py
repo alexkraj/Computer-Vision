@@ -32,8 +32,8 @@ skip_forward_file_pattern = ""  # set to timestamp to skip forward to
 crop_disparity = False  # display full or cropped disparity image
 pause_playback = False  # pause until key press after each image
 
-confThreshold = 0.5  # Confidence threshold
-nmsThreshold = 0.4   # Non-maximum suppression threshold
+threshold_confidence = 0.5  # Confidence threshold
+threshold_nms = 0.4   # Non-maximum suppression threshold
 inpWidth = 416       # Width of network's input image
 inpHeight = 416      # Height of network's input image
 
@@ -79,20 +79,43 @@ def calculate_stereo_disparity(image_left, image_right):
 
 def calculate_median(arr):
     if arr and (median(arr) < 45):
-        return str(round(median(arr),2)) + " m"
+        return round(median(arr), 2)
 
 
-####################### GET COORDINATES OF THE BOX #######################
+######################### GET CENTRES OF THE BOX #########################
+# Lessen the size of the box for the calculation:
+def get_pixel_number(top, bottom, left, right):
+    y = top-bottom
+    x = left-right
+    percentage = 0.3
+    return (y * x * percentage)/100
+
+
+def get_horizontal_centre(left_val, right_val, length):
+    lower = ceil((left_val + right_val) / 2 - length)
+    higher = ceil((left_val + right_val) / 2 + length)
+    return lower, higher
+
+
+def get_vertical_centre(top_val, bottom_val, length):
+    lower = ceil((top_val + bottom_val) / 2 - length)
+    higher = ceil((top_val + bottom_val) / 2 + length)
+    return lower, higher
+
+
+# def get_coordinate_array(top, bottom, left, right):
+#     x_start, x_end = get_horizontal_centre(left, right, get_pixel_number(top, bottom, left, right)/2)
+#     y_start, y_end = get_vertical_centre(top, bottom, get_pixel_number(top, bottom, left, right)/2)
 
 
 ############################## DRAW THE BOX ##############################
-def drawPred(image, class_name, confidence, left, top, right, bottom, colour):
+# def drawPred(image, class_name, confidence, left, top, right, bottom, colour, distance):
+def drawPred(class_name, confidence, left, top, right, bottom, image, colour, distance):
     # Draw a bounding box.
     cv2.rectangle(image, (left, top), (right, bottom), colour, 3)
-
-    distance = 5
-    # construct label
-    label = '%s (%.2f) = %.2f m away' % (class_name, confidence, distance)
+    if distance is None:
+        return
+    label = '%s (%.2f) = ' % (classes[class_name], confidence) + str(distance) + ' m away' 
     if(class_name in classes_checked):
         objects_in_scene_classes.append(class_name)
         objects_in_scene_distances.append(distance)
@@ -105,8 +128,9 @@ def drawPred(image, class_name, confidence, left, top, right, bottom, colour):
                          (255, 255, 255), cv2.FILLED)
     cv2.putText(image, label, (left, top), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
 
+
 ################ REMOVE BOUNDING BOXES WITH LOW CONFIDENCE ###############
-def postprocess(image, results, threshold_confidence, threshold_nms):
+def postprocess(image, results):
     frameHeight = image.shape[0]
     frameWidth = image.shape[1]
     classIDs = []
@@ -141,7 +165,8 @@ def postprocess(image, results, threshold_confidence, threshold_nms):
         boxes_nms.append(boxes[i])
 
     # return post processed lists of classIds, confidences and bounding boxes
-    return (classIDs_nms, confidences_nms, boxes_nms)
+    # return (classIDs_nms, confidences_nms, boxes_nms)
+    return classIDs, boxes, confidences, threshold_confidence, threshold_nms
 
 
 def getOutputsNames(net):
@@ -184,7 +209,6 @@ for filename_left in left_file_list:
         # left mask
         # right mask
         disparity = calculate_stereo_disparity(imgL, imgR)
-        
         cv2.imshow("Disparity", (disparity * (256. / max_disparity)).astype(np.uint8))
 
         frame = imgL
@@ -198,25 +222,56 @@ for filename_left in left_file_list:
         results = net.forward(output_layer_names)
 
         # remove the bounding boxes with low confidence
-        classIDs, confidences, boxes = postprocess(frame, results, confThreshold, nmsThreshold)
+        classIDs,  boxes, confidences, threshold_confidence, threshold_nms = postprocess(frame, results)
 
-        for detected_object in range(0, len(boxes)):
-            box = boxes[detected_object]
+        #TODO add this to report:
+        indices = cv2.dnn.NMSBoxes(boxes, confidences, threshold_confidence, threshold_nms)
+
+
+        #########################################################
+        for i in indices:
+            i = i[0]
+            box = boxes[i]
             left = box[0]
             top = box[1]
             width = box[2]
             height = box[3]
+            
+            x_start, x_end = get_horizontal_centre(left, left + width, get_pixel_number(top, top + height, left, left + width)/2)
+            y_start, y_end = get_vertical_centre(top, top + height, get_pixel_number(top, top + height, left, left + width)/2)
+            
+            Z = []
+            # Go through all pixels and calculate Z taking into account focal length and baseline
+            for x in range(x_start, x_end):
+                for y in range(y_start, y_end):
+                    # Calculate Z = (f * B) / disparity[y, x];
+                    try:
+                        if (disparity[y, x] > 0):
+                            Z.append((camera_focal_length_px * stereo_camera_baseline_m) / disparity[y, x])
+                    except IndexError:
+                        continue
 
-            # distance = median(z_axis_value)
-            drawPred(frame, classes[classIDs[detected_object]], confidences[detected_object], left, top, left + width, top + height, (255, 178, 50))
+            depth = calculate_median(Z)  # Get depth by calculating a median of 30% of the box pixels in the middle
+
+            drawPred(classIDs[i], confidences[i], left, top, left + width, top + height, backup_imgL,(255, 178, 50), depth)
+        #########################################################
+
+        # for detected_object in range(0, len(boxes)):
+        #     box = boxes[detected_object]
+        #     left = box[0]
+        #     top = box[1]
+        #     width = box[2]
+        #     height = box[3]
+
+        #     # distance = median(z_axis_value)
+        #     drawPred(frame, classes[classIDs[detected_object]], confidences[detected_object], left, top, left + width, top + height, (255, 178, 50))
 
         objects_in_scene_classes = []
         objects_in_scene_distances = []
 
-        cv2.imshow(windowName, frame)
-        
+        cv2.imshow(windowName, backup_imgL)
         stop_t = ((cv2.getTickCount() - start_t)/cv2.getTickFrequency()) * 1000
-        print("YOLOv3 took %.2f ms to process this frame"% (stop_t))
+        print("YOLOv3 took %.2f ms to process this frame" % (stop_t))
 
         key = cv2.waitKey(40 * (not(pause_playback))) & 0xFF  # wait 40ms (i.e. 1000ms / 25 fps = 40 ms)
         if (key == ord('x')):       # exit
@@ -225,7 +280,7 @@ for filename_left in left_file_list:
             cv2.imwrite("sgbm-disparty.png", disparity)
             cv2.imwrite("left.png", imgL)
             cv2.imwrite("right.png", imgR)
-        elif (key == ord('c')): # crop
+        elif (key == ord('c')):  # crop
             crop_disparity = not(crop_disparity)
         elif (key == ord('p')):  # pause (on next frame)
             pause_playback = not(pause_playback)
