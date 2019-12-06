@@ -1,7 +1,7 @@
 COMPUTER VISION - ASSIGNMENT 2019/2020 CTVT58
 ===================================================================================
 
-_____________________________1. Running the Prototype_____________________________
+_____________________________1. Running the Prototype______________________________
 
 ***To run the program on Linux/Mac/Mira:***
 *note that Mira can be accessed on the university computers using the windows
@@ -12,8 +12,8 @@ Ensure that all the requisite libraries are installed in the path:
 - numpy
 - opencv
 
-Ensure that the directory structure is correct. The program main.py accesses 2 folders
-of data, namely:
+Ensure that the directory structure is correct. The program main.py accesses 2 
+folders of data, namely:
 
 ../data/
 ../masks/
@@ -27,3 +27,9 @@ variable names:
 master_path_to_dataset
 left_mask
 right_mask
+
+________________________________2. Video and System________________________________
+
+The video of the running code was recorded on a Late-2016 MacBook Pro
+2GHz Intel Core i5
+16GB Memory
