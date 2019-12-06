@@ -18,3 +18,4 @@ DECISIONS:
 - removing drawing/expensive calculations for items we were not looking for
 - mask to ignore the car itself
 - distance calculation of the means of the box in the disparity
+- added masks to the disparity calculation

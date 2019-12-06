@@ -1,12 +1,31 @@
 # CTVT58
-# SSA - Computer Vision Coursework - Due Fri 6/12/2019
+# SSA - Computer Vision Coursework
 
-import cv2
+#####################################################################
+# Reference: Copyright (c) 2019 Toby Breckon, Durham University, UK
+# License : LGPL - http://www.gnu.org/licenses/lgpl.html
+
+# Implements the You Only Look Once (YOLO) object detection architecture described in full in:
+# Redmon, J., & Farhadi, A. (2018). Yolov3: An incremental improvement. arXiv preprint arXiv:1804.02767.
+# https://pjreddie.com/media/files/papers/YOLOv3.pdf
+
+# This code: significant portions based in part on the tutorial and example available at:
+# https://www.learnopencv.com/deep-learning-based-object-detection-using-yolov3-with-opencv-python-c/
+# https://github.com/spmallick/learnopencv/blob/master/ObjectDetection-YOLO/object_detection_yolo.py
+# under LICENSE: https://github.com/spmallick/learnopencv/blob/master/ObjectDetection-YOLO/LICENSE
+
+# Copyright (c) 2017 Department of Computer Science,
+#                    Durham University, UK
+# License : LGPL - http://www.gnu.org/licenses/lgpl.html
+#####################################################################
+
 import os
-import numpy as np
 from math import ceil
 from statistics import median
 
+import numpy as np
+
+import cv2
 
 # STEREO DISPARITY VARIABLES
 master_path_to_dataset = "../datav/"  # ** need to edit this **
@@ -53,7 +72,6 @@ camera_focal_length_px = 399.9745178222656  # focal length in pixels
 camera_focal_length_m = 4.8 / 1000  # focal length in metres (4.8 mm)
 stereo_camera_baseline_m = 0.2090607502  # camera baseline in metres
 windowName = 'YOLOv3 object detection: ' + weights_file
-# cv2.imshow(windowName, cv2.WINDOW_NORMAL)
 
 max_disparity = 64
 
@@ -62,13 +80,22 @@ left_mask = cv2.imread("../masks/left.png", cv2.IMREAD_GRAYSCALE)
 right_mask = cv2.imread("../masks/right.png", cv2.IMREAD_GRAYSCALE)
 
 
-############################# GET DISPARITY #############################
+"""_________________________GET DISPARITY_________________________"""
+
+
 # TODO Improve disparity calculation (this might help in the marks $$$)
 def calculate_stereo_disparity(image_left, image_right):
     stereoProcessor = cv2.StereoSGBM_create(0, max_disparity, 21)
 
-    grey_left = cv2.cvtColor(image_left, cv2.COLOR_BGR2GRAY)
-    grey_right = cv2.cvtColor(image_right, cv2.COLOR_BGR2GRAY)
+    masked_L = cv2.bitwise_and(image_left, image_left, mask=left_mask)
+    masked_R = cv2.bitwise_and(image_right, image_right, mask=right_mask)
+
+    # TODO add filtering in analysis
+    grey_left = cv2.cvtColor(masked_L, cv2.COLOR_BGR2GRAY)
+    grey_left = cv2.bilateralFilter(grey_left, 9, 75, 75)
+    grey_right = cv2.cvtColor(masked_R, cv2.COLOR_BGR2GRAY)
+    grey_right = cv2.bilateralFilter(grey_right, 9, 75, 75)
+
     # perform preprocessing - raise to the power, as this subjectively
     # appears to improve subsequent disparity calculation
     grey_left = np.power(grey_left, 0.75).astype('uint8')
@@ -77,7 +104,7 @@ def calculate_stereo_disparity(image_left, image_right):
     disparity = stereoProcessor.compute(grey_left, grey_right)
 
     # TODO report different values here
-    dispNoiseFilter = 10  # increase for more agressive filtering
+    dispNoiseFilter = 25  # increase for more agressive filtering
     cv2.filterSpeckles(disparity, 0, 4000, max_disparity - dispNoiseFilter)
 
     _, disparity = cv2.threshold(disparity, 0, max_disparity * 16,
@@ -92,7 +119,9 @@ def calculate_median(arr):
         return round(median(arr), 2)
 
 
-######################### GET CENTRES OF THE BOX #########################
+"""_________________________GET BOX CENTRES_________________________"""
+
+
 # Lessen the size of the box for the calculation:
 def get_pixel_number(top, bottom, left, right):
     y = top-bottom
@@ -113,7 +142,9 @@ def get_vertical_centre(top_val, bottom_val, length):
     return lower, higher
 
 
-############################## DRAW THE BOX ##############################
+"""_________________________DRAW THE BOX_________________________"""
+
+
 def drawPred(class_name, confidence, left, top, right, bottom,
              image, colour, distance):
     # TODO add this check to report
@@ -139,7 +170,9 @@ def drawPred(class_name, confidence, left, top, right, bottom,
                 0.5, (0, 0, 0), 1)
 
 
-################ REMOVE BOUNDING BOXES WITH LOW CONFIDENCE ###############
+"""__________REMOVE BOUNDING BOXES WITH LOW CONFIDENCE_______ """
+
+
 def postprocess(image, results):
     frameHeight = image.shape[0]
     frameWidth = image.shape[1]
@@ -184,19 +217,21 @@ def getOutputsNames(net):
     return [layersNames[i[0] - 1] for i in net.getUnconnectedOutLayers()]
 
 
-####################### SETTING DARKNET VARIABLES ########################
+"""__________________SETTING DARKNET VARIABLES__________________ """
 net = cv2.dnn.readNetFromDarknet(config_file, weights_file)
 output_layer_names = getOutputsNames(net)
 net.setPreferableBackend(cv2.dnn.DNN_BACKEND_DEFAULT)
 net.setPreferableTarget(cv2.dnn.DNN_TARGET_OPENCL)
 
 
-######################### RUNNING THE ANALYSIS ###########################
+"""_____________________RUNNING THE ANALYSIS_____________________ """
 for filename_left in left_file_list:
 
-    if ((len(skip_forward_file_pattern) > 0) and not(skip_forward_file_pattern in filename_left)):
+    if ((len(skip_forward_file_pattern) > 0)
+            and not(skip_forward_file_pattern in filename_left)):
         continue
-    elif ((len(skip_forward_file_pattern) > 0) and (skip_forward_file_pattern in filename_left)):
+    elif ((len(skip_forward_file_pattern) > 0)
+            and (skip_forward_file_pattern in filename_left)):
         skip_forward_file_pattern = ""
 
     filename_right = filename_left.replace("_L", "_R")
@@ -209,7 +244,8 @@ for filename_left in left_file_list:
     print(full_path_filename_right)
     print()
 
-    if ('.png' in filename_left) and (os.path.isfile(full_path_filename_right)):
+    if (('.png' in filename_left)
+            and (os.path.isfile(full_path_filename_right))):
 
         imgL = cv2.imread(full_path_filename_left, cv2.IMREAD_COLOR)
         imgR = cv2.imread(full_path_filename_right, cv2.IMREAD_COLOR)
@@ -274,7 +310,7 @@ for filename_left in left_file_list:
                      top + height, backup_imgL, (255, 178, 50), depth)
         #########################################################
         try:
-            print("Nearest detected scene object: (" +
+            print(">> Nearest detected scene object: (" +
                   str(min(objects_in_scene_distances))+"m)")
         except (ValueError, TypeError):
             print("Nearest detected scene object: (0.0m)")
@@ -284,8 +320,8 @@ for filename_left in left_file_list:
         cv2.namedWindow(windowName, cv2.WINDOW_NORMAL)
         cv2.imshow(windowName, backup_imgL)
         stop_t = ((cv2.getTickCount() - start_t)/cv2.getTickFrequency()) * 1000
-        print("YOLOv3 took %.2f ms to process this frame" % (stop_t))
-        print("____________________________________________")
+        print(">> YOLOv3 took %.2f ms to process this frame" % (stop_t))
+        print("_______________________________________________")
 
         # wait 40ms (i.e. 1000ms / 25 fps = 40 ms)
         key = cv2.waitKey(40 * (not(pause_playback))) & 0xFF
