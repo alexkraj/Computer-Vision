@@ -1,5 +1,6 @@
 .DS_Store
 data/
+datav/
 code/yolov3.weights
 *.vscode
 

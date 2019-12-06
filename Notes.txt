@@ -7,3 +7,14 @@ Quantitative evidence of performance - examples of it working
 
 Script must display the colour image AND the disparity image as it runs	
 - Can keep in the same window
+
+TODO: for challenging conditions
+- masks to stop confusion
+- filleting the disparity 
+- help difficult conditions
+
+DECISIONS:
+- Changing the disparity noise filter size
+- removing drawing/expensive calculations for items we were not looking for
+- mask to ignore the car itself
+- distance calculation of the means of the box in the disparity
