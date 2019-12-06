@@ -22,7 +22,7 @@ of data, namely:
 - ../masks/ is a directory containing left and right binary masks (left.png and 
 right.png respectfully)
 
-Both of these variables can be changed in the main.py program under the following 
+All of these variables can be changed in the main.py program under the following 
 variable names:
 master_path_to_dataset
 left_mask
